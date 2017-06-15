@@ -1,0 +1,367 @@
+#!/sw/bin/python
+import colorsys
+import matplotlib
+matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import numpy as np
+import pyvoro
+import scipy
+import sys
+from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+#from scipy.spatial import Voronoi
+
+#https://github.com/JensWehner/KAI-Model/blob/master/lib/__geometry__.py
+
+class struct(object):
+    pass
+
+def readFile(filename):
+    limits = []
+    points = []
+    radii = []
+    ids = []
+    timestep = None
+    with open(filename, 'r') as file:
+        inputSection = 0
+        for line in file:
+            if (inputSection == 3):
+                lineStrip = line.strip().split()
+                id = int(lineStrip[0])
+                x = float(lineStrip[1])
+                y = float(lineStrip[2])
+                z = float(lineStrip[3])
+                rad = float(lineStrip[4])
+                ids.append(id)
+                points.append([x,y,z])
+                radii.append(rad)
+                continue
+            elif (inputSection == 2):
+                if (line[0:11] == 'ITEM: ATOMS'):
+                    inputSection = 3
+                    continue
+                if (len(limits) < 3):
+                    lineStrip = line.strip().split()
+                    lower = float(lineStrip[0])
+                    upper = float(lineStrip[1])
+                    limits.append([lower, upper])
+                    continue
+            elif (inputSection == 1):
+                if (line[0:16] == 'ITEM: BOX BOUNDS'):
+                    inputSection = 2
+                    continue
+                if (timestep == None):
+                    timestep = int(line)
+                    continue
+            elif (inputSection == 0):
+                if (line[0:14] == 'ITEM: TIMESTEP'):
+                    inputSection = 1
+                    continue
+            else:
+                assert(1 == 0)
+    return timestep, ids, points, radii, limits
+
+def writeVolumesFile(filename, ids, volumes):
+    if (filename == None):
+        return
+    with open(filename, 'w') as file:
+        file.write('#volumes: ID, volume\n') 
+        for id,vol in zip(ids,volumes):
+            file.write('{} {}\n'.format(id,vol)) 
+    return
+
+def writeFaceNormalsFile(filename, normals):
+    if (filename == None):
+        return
+    with open(filename, 'w') as file:
+        file.write('#face unit normals: nx, ny, nz\n') 
+        for vec in normals:
+            file.write('{} {} {}\n'.format(vec[0], vec[1], vec[2]))
+    return
+
+def writeMshFile(filename, verts, edges):
+    if (filename == None):
+        return
+    with open(filename, 'w') as file:
+        file.write('$MeshFormat\n') 
+        file.write('2.0 0\n') 
+        file.write('2.0 0\n') 
+        file.write('$Nodes\n') 
+        file.write('{}\n'.format(len(verts))) 
+        for i in range(0, len(verts)):
+            vert = verts[i]
+            file.write('{} {} {} {}\n'.format(i+1, vert[0], vert[1], vert[2])) 
+        file.write('$EndNodes\n') 
+        file.write('$Elements\n') 
+        file.write('{}\n'.format(len(edges))) 
+        for i in range(0, len(edges)):
+            edge = edges[i]
+            file.write('{} {} {} {} {}\n'.format(i+1, 1, 0, edge[0]+1, edge[1]+1)) #type: 1 = 2-node line, number of physical group tags = 0 
+        file.write('$EndElements\n') 
+        #do I need physical groups??? probably...
+    return
+
+def getNormal(faceVert, vertices):
+    v0 = np.array( vertices[ faceVert[0] ] )
+    v1 = np.array( vertices[ faceVert[1] ] )
+    v2 = np.array( vertices[ faceVert[2] ] )
+    normal = np.cross(v1-v0, v2-v0)
+    normal = normal / np.linalg.norm(normal)
+    return list(normal)
+
+def findVert(vertex, uniqueVert):
+    for i in range(0, len(uniqueVert)):
+        if (np.allclose(list(vertex), uniqueVert[i])):
+            return i
+    assert(1 == 0)
+
+def findVertSet(vertex, uniqueVert):
+    for vert in uniqueVert: 
+        if (np.allclose(list(vertex), vert)): 
+            return vert
+    return -1
+
+def hashFn(vec):
+    a = vec[0]
+    b = vec[1]
+    c = vec[2]
+    dec = 4
+    return hash(tuple([round(a,dec), round(b,dec), round(c,dec)])) 
+
+def getVertices(cells):
+    vertices = []
+    vertSet = set()
+    vertHashTable = dict()
+    for i in range(0, len(cells)):
+#        if (i % (len(cells)/10) == 0):
+#            print '  {} of {}'.format(i, len(cells))
+        cell = cells[i]
+        verts = cell['vertices']
+        cell['hashes'] = [] 
+        for vert in verts:
+            initLength = len(vertSet)
+
+            hashVal = hashFn(vert)
+            vertSet.add(hashVal)
+ 
+            cell['hashes'].append(hashVal)
+#either hashing is screwed up (possible, but several flavors give same result), or node numbering is            
+            #if new, add hash to dict
+            if (len(vertSet) > initLength):
+                assert( len(vertSet) == initLength + 1)
+                vertices.append(tuple(vert))  #set version
+                vertHashTable[hashVal] = initLength #0-based indexing, internally 
+    return vertices,vertHashTable
+
+def plotSphere(ax, col, centroid, rad):
+    u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi:10j]
+    x = np.cos(u)*np.sin(v)*rad + centroid[0]
+    y = np.sin(u)*np.sin(v)*rad + centroid[1]
+    z = np.cos(v)*rad + centroid[2]
+    ax.plot_wireframe(x, y, z, color=col)
+
+def initPlot(N):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_aspect("equal")
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+
+    HSV_tuples = [(x*1.0/N, 0.5, 0.5) for x in range(N)]
+    RGB_tuples = map(lambda x: colorsys.hsv_to_rgb(*x), HSV_tuples)
+    color = RGB_tuples
+
+    return fig, ax, color
+
+def atLimits(points,limits):
+    #is this face on the limits?
+    xmin = limits[0][0]
+    xmax = limits[0][1]
+    ymin = limits[1][0]
+    ymax = limits[1][1]
+    zmin = limits[2][0]
+    zmax = limits[2][1]
+    if np.allclose( [pt[0] for pt in points], xmin):
+        return 1 
+    if np.allclose( [pt[0] for pt in points], xmax):
+        return 1 
+    if np.allclose( [pt[1] for pt in points], ymin):
+        return 1 
+    if np.allclose( [pt[1] for pt in points], ymax):
+        return 1 
+    if np.allclose( [pt[2] for pt in points], zmin):
+        return 1 
+    if np.allclose( [pt[2] for pt in points], zmax):
+        return 1 
+#    if all(pt[0] == xmin for pt in points):
+#        return 1
+    return 0
+
+def plotCell(ax, col, cell, rad, limits, uniqueVert, vertHashTable):
+    normals = []
+    vertices = cell['vertices']
+    verts = np.array(vertices)
+    #plot vertices
+    if (ax != None):
+        ax.scatter(verts[:,0], verts[:,1], verts[:,2])
+    #connect vertices with lines
+    faces = cell['faces']
+
+    edges = set()
+ 
+#    for face in faces:
+    for k in range(0, len(faces)):
+        face = faces[k]
+#        print "    f {} of {}".format(k, len(faces)) 
+#        print face
+        faceVert = face['vertices']
+        pverts = [zip(verts[faceVert,0], verts[faceVert,1], verts[faceVert,2])]
+
+        normals.append(getNormal(faceVert, vertices))
+
+        for i in range(0, len(faceVert)):
+#            print "      v {} of {}".format(i, len(faceVert)) 
+#            print "          a" 
+            j = (i+1) % len(faceVert) 
+            m = faceVert[i]
+            n = faceVert[j]
+        #    if (ax != None):
+#                ax.plot( verts[[m,n],0], verts[[m,n],1], verts[[m,n],2], color=col )
+
+            #record edges
+            #EXCLUDE faces on limits
+#            if (1):
+            if (not atLimits(pverts[0], limits)):
+#                print "          a" 
+                #also exclude edges on limits
+                everts = [zip(verts[[m,n],0], verts[[m,n],1], verts[[m,n],2])]
+#                print "          b" 
+#                if (1):
+                if (not atLimits(everts[0], limits)):
+#                    print "          c" 
+                    if (ax != None):
+                        ax.plot( verts[[m,n],0], verts[[m,n],1], verts[[m,n],2], color=col )
+
+#                    print "          d ** this part needs to be faster" 
+                    #store edge (find global vertices)
+#                    print tuple(verts[m,:])
+#                    print hash(tuple(verts[m,:]))
+#                    print vertHashTable[ hash(tuple(verts[m,:])) ]
+#                    print vertHashTable[ hash(tuple(verts[n,:])) ]
+                    mHash = cell['hashes'][m]
+                    nHash = cell['hashes'][n]
+                    mGlobal = vertHashTable[mHash] 
+                    nGlobal = vertHashTable[nHash]
+#                    mGlobal = findVert(verts[m,:], uniqueVert)
+#                    nGlobal = findVert(verts[n,:], uniqueVert)
+#                    print "          e" 
+                    entry = [mGlobal, nGlobal]
+                    entry.sort()
+#                    print "          f" 
+                    edges.add( tuple(entry) ) 
+#                    print "          g" 
+        #draw face
+        #EXCLUDE on limits
+        if (ax != None):
+            if (not atLimits(pverts[0], limits)):
+                ax.add_collection3d(Poly3DCollection(pverts, facecolors=col))
+
+    #transcluent 3d object
+
+    # draw sphere
+    centroid = cell['original']
+    if (ax != None):
+        plotSphere(ax, col, centroid, rad)
+
+    #output edges
+#    print 'cell edge:',edges
+    volume = cell['volume']
+    return edges, volume, normals
+
+
+def main(filename,plot='no'):
+    varlist = struct()
+
+    timestep,ids,points,radii,limits = readFile(filename)
+#    ids = ids[0:200]
+#    points = points[0:200]
+#    radii = radii[0:200]
+
+    #input
+#    points = [[1.0, 2.0, 3.0], [4.0, 5.5, 6.0], [0, 5.0, 0] ] # point positions
+#    limits = [[0.0, 10.0], [0.0, 10.0], [0.0, 10.0]] # limits
+#    radii=[1.3,1.4, 2] # particle radii -- optional, and keyword-compatible arg.
+    block_size = 4*max(radii) #2.0 # block size : maximum distance that two adjacent particles might be
+    ids = [i for i in range(1,1+len(points))]
+    periodic = [True, True, False]
+    meshFilename = 'edges.msh'  #None 
+    volFilename = 'vols.txt'    #None
+    normsFilename = 'norms.txt' #None
+
+    print "*Calculating voronoi tessellation for ",filename
+    varlist.cells = pyvoro.compute_voronoi( points, limits, block_size, radii=radii, periodic=periodic)
+    count = len(varlist.cells)
+
+    totalVert = 0
+    for i in range(0,len(varlist.cells)):
+        cell = varlist.cells[i]
+        totalVert += len(cell['vertices'])
+#        for j in range(0, len(cell['vertices'])):
+#            vert = cell['vertices'][j]
+#            print i,j,vert
+
+    print "*Post-processing voronoi tessellation for ",filename
+    if (plot == 'yes'):
+        fig,ax,color = initPlot( count )
+    else:
+        ax = None
+        color = [None]*count
+
+    #unique list of vertices
+    print " *Getting unique vertices"
+    uniqueVert,vertHashTable = getVertices(varlist.cells)
+
+#    for i in range(0, len(uniqueVert)):
+#        print i, uniqueVert[i]
+    assert(totalVert != len(uniqueVert) )
+#    print vertHashTable
+#    for i in range(0, len(
+
+    #print varlist.cells
+    print " *Getting edges"
+    edges = set()
+    normals = []
+    volumes = []
+    for i in range(0, count):
+        cell = varlist.cells[i]
+        rad = radii[i]
+        col = color[i]
+    #    print ""
+    #    print cell
+#        print "  c {} of {}".format(i,count)
+        cellEdge,cellVol,cellNorms = plotCell(ax,col,cell,rad,limits,uniqueVert,vertHashTable)
+        edges = edges.union(cellEdge)
+        normals.extend(cellNorms)
+        volumes.append(cellVol)
+#    print edges
+    if (plot == 'yes'):
+        plt.show()
+
+
+    print "*Writing to files"
+    #print global skeleton
+    writeMshFile(meshFilename, uniqueVert, list(edges) )
+ 
+    #write volumes to file
+    writeVolumesFile(volFilename, ids, volumes)
+  
+    #write faceNormals to file
+    writeFaceNormalsFile(normsFilename, normals)
+
+#need to read in liggghts file, or be called by liggghts python
+filename = sys.argv[1]
+#plot='yes'
+plot='no'
+main(filename,plot)

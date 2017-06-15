@@ -1,0 +1,92 @@
+#Contact model example
+
+variable r index 0.0015 
+variable rLow equal ${r}*0.793701
+variable rHigh equal ${r}*1.25992
+variable insertSteps index 2 
+variable endSteps equal ${insertSteps}+100000 
+
+atom_style	granular
+atom_modify	map array
+boundary	p p m
+newton		off
+
+communicate	single vel yes
+
+units		si
+
+region		reg block -0.05 0.05 -0.05 0.05 0. 0.15 units box
+create_box	1 reg
+
+neighbor	0.002 bin
+neigh_modify	delay 0
+
+
+#Material properties required for new pair styles
+
+fix 		m1 all property/global youngsModulus peratomtype 5.e6
+fix 		m2 all property/global poissonsRatio peratomtype 0.25
+fix 		m3 all property/global coefficientRestitution peratomtypepair 1 0.9
+fix 		m4 all property/global coefficientFriction peratomtypepair 1 0.15
+fix 		m5 all property/global characteristicVelocity scalar 2.
+fix 		m6 all property/global cohesionEnergyDensity peratomtypepair 1 300 #000
+
+#New pair style
+pair_style 	gran model hertz tangential history cohesion sjkr  #Hertzian with cohesion
+pair_coeff	* *
+
+timestep	0.00001
+
+fix		gravi all gravity 9.81 vector 0.0 0.0 -1.0
+
+fix		zwalls1 all wall/gran model hertz tangential history primitive type 1 zplane 0.0
+fix		zwalls2 all wall/gran model hertz tangential history primitive type 1 zplane 0.15
+#fix		cylwalls all wall/gran model hertz tangential history primitive type 1 zcylinder 0.05 0.0 0.0
+
+#region for insertion
+region		bc cylinder z 0.0 0.0 0.04 0.13 0.1403 units box
+#region		bc cylinder z 0.0 0.0 0.045 0.13 0.1403 units box
+#region		bc block -0.04 0.04 -0.04 -0.04 0.13 0.14 units box
+group		nve_group region reg
+
+#deprecated pour command
+#fix		ins nve_group pour 1000 1 1 vol 0.7 1000 diam uniform 0.003 0.003 dens uniform 2500 2500 vel uniform 0. 0. 0. 0. -0.2 region bc
+
+#distributions for insertion
+fix		pts0 all particletemplate/sphere 14447 atom_type 1 density constant 2500 radius constant ${rLow}
+fix		pts1 all particletemplate/sphere 14323 atom_type 1 density constant 2500 radius constant ${r}
+fix		pts2 all particletemplate/sphere 14197 atom_type 1 density constant 2500 radius constant ${rHigh}
+fix		pdd1 all particledistribution/discrete/massbased 14449  3 pts0 0.25 pts1 0.5 pts2 0.25
+
+#particle insertion
+fix		ins nve_group insert/pack seed 14461 distributiontemplate pdd1 &
+			maxattempt 100 insert_every 3000 overlapcheck yes all_in yes vel constant 0.0 0.0 -0.2 &
+			region bc particles_in_region 100 ntry_mc 10000
+
+#apply nve integration to all particles that are inserted as single particles
+fix		integr nve_group nve/sphere
+
+#output settings, include total thermal energy
+compute		1 all erotate/sphere
+thermo_style	custom step atoms ke c_1 vol
+thermo		1000
+thermo_modify	lost ignore norm no
+compute_modify	thermo_temp dynamic yes
+
+compute contactnum all contact/atom
+compute 2 all pair/gran/local id pos force contactArea delta  #calculate the contact info
+
+#insert the first particles so that dump is not empty
+run		1
+dump		dmp all custom 1000 post/dump*.generation id type type x y z ix iy iz vx vy vz fx fy fz omegax omegay omegaz radius c_contactnum   #this is general output
+#dump d0 all image 10000 post/dump.*.png type type adiam ${2r} 
+dump d2 all local 1000 post/generation.*.contact_dump index c_2[1] c_2[2] c_2[3] c_2[4] c_2[5] c_2[6] c_2[7] c_2[8] c_2[9] c_2[10] c_2[11] c_2[12] c_2[13] c_2[14]   #this is contact info
+#dump d3 all custom 1000 post/generation*.voro id c_voro[1] #c_voro[2]  
+dump d3 all custom 1000 post/generation.*.voro_input id x y z radius #this is short info for voronoi calc
+
+#insert particles
+run		${insertSteps}
+unfix		ins
+
+#run
+run		${endSteps} upto
