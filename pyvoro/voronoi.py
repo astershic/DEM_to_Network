@@ -6,6 +6,7 @@ matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
+import os
 import pyvoro
 import scipy
 import StringIO
@@ -464,9 +465,10 @@ def main(filename,plot='no'):
 #    radii=[1.3,1.4, 2] # particle radii -- optional, and keyword-compatible arg.
     block_size = 4*max(radii) #2.0 # block size : maximum distance that two adjacent particles might be
     ids = [i for i in range(1,1+len(points))]
-    meshFilename = 'edges.msh'  #None 
-    volFilename = 'vols.txt'    #None
-    normsFilename = 'norms.txt' #None
+    base = '.'.join(os.path.basename(filename).split('.')[:-1])
+    meshFilename = base+'_edges.msh'  #None 
+    volFilename = base+'_vols.txt'    #None
+    normsFilename = base+'_norms.txt' #None
 
     print "*Calculating voronoi tessellation for ",filename
     while True:
