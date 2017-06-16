@@ -16,6 +16,15 @@ def readGeneralFile(file,limits):
     position = {}
     physical = {}
 
+    xmin = limits[0][0]
+    xmax = limits[0][1]
+    ymin = limits[1][0]
+    ymax = limits[1][1]
+    zmin = limits[2][0]
+    zmax = limits[2][1]
+
+    #might consider a percentage-based BC
+
     atomFlag = -1
     with open(file,'r') as data:
         for line in data:
@@ -38,17 +47,17 @@ def readGeneralFile(file,limits):
                 position[idx] = pos
 
                 bc = []
-                if xc - rad <= limits[0][0]:
+                if xc - rad <= xmin: 
                     bc.append(1) 
-                if xc + rad >= limits[0][1]:
+                if xc + rad >= xmax:
                     bc.append(2) 
-                if yc - rad <= limits[1][0]:
+                if yc - rad <= ymin:
                     bc.append(3) 
-                if yc + rad >= limits[1][1]:
+                if yc + rad >= ymax:
                     bc.append(4) 
-                if zc - rad <= limits[2][0]:
+                if zc - rad <= zmin:
                     bc.append(5) 
-                if zc + rad >= limits[2][1]:
+                if zc + rad >= zmax: 
                     bc.append(6)
                 physical[idx] = bc 
 
