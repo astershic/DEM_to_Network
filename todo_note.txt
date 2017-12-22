@@ -1,0 +1,31 @@
+#ffmpeg -r 1 -i data/input-%4d.png -pix_fmt yuv420p -r 30 data/output.mp4
+
+#contact status (generation*.dump): id p1x p1y p1z p2x p2y p2z p1id p2id periodic fx fy fz contactarea delta
+
+#######
+#TO DO:
+#create imagery for srdjan
+
+#(PY) physical edges for ETH
+#(PY) physical edges for LIGGGHTS
+
+#(PY) contact boundary Z override 
+#(PY) voronoi boundary Z override 
+#(PY) connection to fabric tensor calculator
+#(MOOSE) Fabric tensor to continuum Moose simulation                   [FT_to_Continuum]
+#(PY) truss network to <voltage,thermal,mechanical> moose simulation   [Network_to_Truss]
+#(PY) voronoi network to <voltage,thermal,mechanical> moose simulation [DEM_to_Network]
+ 
+#python:
+#  remove particles above certain height
+#  run until kinetic under limit
+#  compression simulations
+#ryan's insitu placement
+#######
+#DONE:
+#(PY) contact boundary conditions (physical groups)
+#(PY) voronoi boundary conditions (physical groups)
+#(PY) voronoi connection to liggghts data (voronoi.py)
+#(PY) voronoi connection to ethz data (voronoi.py)
+#(PY) contact dump to truss network (findContact.py)
+#(PY) element dataa (delta, contact area, contact force)
