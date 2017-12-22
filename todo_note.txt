@@ -12,11 +12,9 @@
 #(PY) contact boundary Z override 
 #(PY) voronoi boundary Z override 
 #(PY) connection to fabric tensor calculator
-#(MOOSE) Fabric tensor to continuum Moose simulation 
-FT_to_Continuum
-#(PY) truss network to <voltage,thermal,mechanical> moose simulation  
-Network_to_Truss
-#(PY) voronoi network to <voltage,thermal,mechanical> moose simulation
+#(MOOSE) Fabric tensor to continuum Moose simulation                   [FT_to_Continuum]
+#(PY) truss network to <voltage,thermal,mechanical> moose simulation   [Network_to_Truss]
+#(PY) voronoi network to <voltage,thermal,mechanical> moose simulation [DEM_to_Network]
  
 #python:
 #  remove particles above certain height
