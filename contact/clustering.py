@@ -50,7 +50,66 @@ def build_adjacency_matrix(elements):
 
     return A, nodes, nodeToIndex
 
-def calc_clusters(elements):
+def calc_clusters_networkx(elements):
+
+    import networkx as nx
+    import matplotlib.pyplot as plt
+
+    #adjacency matrix
+    print " #Building Adjacency Matrix"
+    A, nodes, nodeToIndex = build_adjacency_matrix(elements)
+    print "  *Matrix Shape: ", A.shape
+    print "  *Non-zero: ", A.nnz
+
+    print " #Finding Connected Groups"
+    groups = []
+    groupSize = []
+    G = nx.Graph(A)
+    groups_generator = nx.connected_components(G)
+#    nx.draw(G)
+#    plt.savefig("simple_path.png") # save as png
+#    plt.show() # display
+ 
+    #convert from networkx format 
+    for g in groups_generator:
+        groups.append(g)
+        groupSize.append(len(g))
+    print groups
+    print groupSize
+    return nodes,groups,groupSize,nodeToIndex
+
+def calc_clusters_scipy(elements):
+
+    import scipy.sparse.csgraph as cs
+
+    #adjacency matrix
+    print " #Building Adjacency Matrix"
+    A, nodes, nodeToIndex = build_adjacency_matrix(elements)
+    print "  *Matrix Shape: ", A.shape
+    print "  *Non-zero: ", A.nnz
+
+    print " #Finding Connected Groups"
+    nGroups, groupMembership = cs.connected_components(A, directed=False)
+
+#    print nGroups
+#    print groupMembership
+
+    #convert from scipy format
+    groups = []
+    for i in range(0, nGroups):
+        groups.append( set() )
+    groupSize = [0] * nGroups
+    for i in range(0, len(groupMembership)): 
+        group = groupMembership[i] 
+        groups[group].add(i)
+        groupSize[group] += 1
+
+    print groups
+    print groupSize
+
+    return nodes,groups,groupSize,nodeToIndex
+
+def calc_clusters_eigen(elements):
 
 
     #adjacency matrix
