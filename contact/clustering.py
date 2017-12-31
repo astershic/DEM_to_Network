@@ -40,7 +40,7 @@ def build_adjacency_matrix(elements):
         A[i2, i1] = 1
 
     #check that every row has an entry
-    Asum = np.sum(A)
+    Asum = A.sum() 
     assert( np.product(Asum) != 0.0 )
 
     #convert to CSR matrix to make faster
@@ -64,27 +64,34 @@ def calc_clusters(elements):
     n = len(nodes)
     Adiag = sum(A).toarray()[0]
 #    print A.toarray()
-    D = diags( Adiag, format="csr", dtype=np.int8)
+    D = diags( Adiag, 0, format="csr", dtype=np.int8)
 #    print D.toarray()
 
     #laplacian
     print " #Building Laplacian Matrix"
     L = D - A
+    L = L.astype(float)
 #    print "L = ",L.toarray()
 
     #normalized symmetric laplacian
     print " #Building Symmetric Laplacian Matrix"
     sqrtD = np.sqrt(Adiag)
-    sqrtD = diags( sqrtD, format="csc")
+    sqrtD = diags( sqrtD, 0, format="csc")
     invSqrtD = inv(sqrtD)
     Lnorm = eye(n) - invSqrtD*A*invSqrtD    
 #    print "Lnorm = ",Lnorm.toarray()
 
     #compute eigenvalues 
     print " #Computing Eigenvalues"
-    vals,vecs = eigsh( L.asfptype() , k = n/2, sigma=-1)
+#    print "n matrix size = ", n
+    laplacian = L 
+#    laplacian = Lnorm 
+    vals,vecs = eigsh( laplacian.asfptype() , k = n/2, sigma=-1)   #n/2 values:   n/2 vecs, length n
+#    print "vals = ",vals
+#    print "vecs = ",vecs
     tol = 1e-3
     vals[np.abs(vals) < tol] = 0
+#    print "vals = ",vals
 
     #normalize (Lnorm)
 #    vecs[np.abs(vecs) < tol] = 0
@@ -97,6 +104,7 @@ def calc_clusters(elements):
         vec[np.abs(vec) < 0.9] = 0
         vec[np.abs(vec) >= 0.9] = 1
         vecs[:,i] = vec
+#    print "normalized vectors = ", vecs
 
     #find connected groups
     print " #Finding Connected Groups"
