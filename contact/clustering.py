@@ -3,6 +3,7 @@
 #trying to find main contact cluster in mesh, so that boundary conditions are sufficient - no free bodies
 
 #python clustering.py 90wt_0bar_contact.msh
+import getopt
 import sys
 import math
 import numpy as np
@@ -237,21 +238,38 @@ def calc_clusters_bruteForce(elements):
     print groupSize
     return nodes, groups, groupSize, nodeToIndex
 
-def cluster_main(filename):
+def cluster_main(filename,style):
 
     if (filename == None):
         elements = [[0,1], [1,2], [2, 4], [4, 0], [4, 1], [5, 6], [3,5], [3,6], [3,7] , [8,9] , [0,10], [11,11], [0,15], [13, 15] ]
     else:
         elements = readMshFile(filename)
  
-    print filename
-#    nodes,groups,groupSize,nodeToIndex = calc_clusters(elements)
-    nodes,groups,groupSize,nodeToIndex = calc_clusters_bruteForce(elements)
+    print "Filename = ",filename
+
+    if   (style.lower() == 'eigen'):
+        nodes,groups,groupSize,nodeToIndex = calc_clusters_eigen(elements)
+    elif (style.lower() == 'networkx'):
+        nodes,groups,groupSize,nodeToIndex = calc_clusters_networkx(elements)
+    elif (style.lower() == 'scipy'):
+        nodes,groups,groupSize,nodeToIndex = calc_clusters_scipy(elements)
+    elif (style.lower() == 'bruteforce'):
+        nodes,groups,groupSize,nodeToIndex = calc_clusters_bruteForce(elements)
+    else:
+        print "Style <{}> not implemented".format(style)
+        assert(1 == 0)
 
     disconnected = identifyDisconnected(nodes, groups, groupSize, nodeToIndex)
 
 if __name__ == "__main__":
-    filename = None
-    if (len(sys.argv) >= 2):
-        filename = sys.argv[1]
-    cluster_main(filename)
+    optlist,args = getopt.getopt(sys.argv[1:],'',longopts=['style='])
+    style = 'scipy' #default
+    for item in optlist:
+        if (item[0] == '--style'):
+            style = item[1] 
+    print "style = ",style
+    if (len(args) > 0):
+        for filename in args:
+            cluster_main(filename,style)
+    else:
+        cluster_main(None,style)
