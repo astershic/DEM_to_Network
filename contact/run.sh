@@ -1,7 +1,7 @@
 #!/bin/bash
 
-time python findContactETH.py ../ethz/90wt_0bar.txt
-#time python findContactETH.py ../ethz/90wt_2000bar.txt
+time python findContactETH.py --clustering ../ethz/90wt_0bar.txt
+time python findContactETH.py --clustering ../ethz/90wt_2000bar.txt
 #time python findContact.py ../DEM/post/dump104000.generation ../DEM/post/generation.104000.contact_dump 
 #time python findContact.py ../DEM/post/dump300000.generation ../DEM/post/generation.300000.contact_dump
 
@@ -27,5 +27,6 @@ time python findContactETH.py ../ethz/90wt_0bar.txt
 
 
 #add clustering/disconnect as option to findContact*.py
+#check msh file okay
+#see if this solves truss problem
 #only print contact to FT contact list when connected to main body
-#does findContact.py have 'connected' connections?

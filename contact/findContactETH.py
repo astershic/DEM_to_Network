@@ -5,6 +5,7 @@
 
 #histogram:   --> cellDatatoPointData --> Histogram
 #line thickness: ---> cellDatatoPointData ---> ExtractSurface --> Tube
+import getopt
 import os
 import math
 import sys
@@ -388,6 +389,11 @@ def main(files,tag,clustering=1):
         writeContactFile(outContactFile, unitvec, weights=area)    #area as scalar weight
     return
 
-tag = ''
-files = sys.argv[1:]
-main(files,tag)
+if __name__ == "__main__":
+    optlist,args = getopt.getopt(sys.argv[1:],'',longopts=['clustering'])
+    clustering = 0
+    for item in optlist:
+        if (item[0] == '--clustering'):
+            clustering = 1 
+    tag = ''
+    main(args,tag,clustering=clustering)
