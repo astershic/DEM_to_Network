@@ -333,9 +333,9 @@ def applyDisconnected( disconnected, physical, code=7):
             physIDs = newPhysical[dxID]
             physIDs.append(code)
             newPhysical[dxID] = physIDs
-            print "physical node",dxID,'disconnected:',physIDs
+#            print "physical node",dxID,'disconnected:',physIDs
         else:
-            print " new node",dxID,'disconnected:',physIDs
+#            print " new node",dxID,'disconnected:',physIDs
             newPhysical[dxID] = [code]   
  
     return newPhysical
@@ -358,7 +358,7 @@ def writeContactFile(file, unitvec, weights=None):
             
     return
 
-def main(files,tag,clustering=1):
+def main(files,tag,clustering):
 
     for file in files:
         base = os.path.basename(file)

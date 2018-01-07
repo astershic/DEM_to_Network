@@ -2,8 +2,10 @@
 
 #python findContact.py post/dump104000.generation post/generation.104000.contact_dump 
 #python findContact.py post/dump18000.generation post/generation.18000.contact_dump 
+import getopt
 import sys
 import math
+from clustering import calc_clusters_scipy,identifyDisconnected
 
 #general:
 #ITEM: ATOMS id type type x y z ix iy iz vx vy vz fx fy fz omegax omegay omegaz radius c_contactnum
@@ -314,6 +316,21 @@ def getGeom(ids, pos):
 
     return verts,edges
  
+def applyDisconnected( disconnected, physical, code=7):
+    newPhysical = dict(physical)
+    
+    for dxID in disconnected:
+        if dxID in newPhysical:
+            physIDs = newPhysical[dxID]
+            physIDs.append(code)
+            newPhysical[dxID] = physIDs
+#            print "physical node",dxID,'disconnected:',physIDs
+        else:
+#            print " new node",dxID,'disconnected:',physIDs
+            newPhysical[dxID] = [code]   
+ 
+    return newPhysical
+
 def writeContactFile(file, verts, edges, weights=None):
 
     numEdges = len(edges)
@@ -348,7 +365,7 @@ def writeContactFile(file, verts, edges, weights=None):
             
     return
 
-def main(files):
+def main(files,clustering):
     assert( len(files) % 2 == 0)
 
     for i in range(0, len(files)/2):
@@ -364,6 +381,12 @@ def main(files):
         print "*Getting geometry"
         verts,edges = getGeom(ids,pos)
 
+        if (clustering == 1):
+            print "*Clustering network"
+            nodes,groups,groupSize,nodeToIndex = calc_clusters_scipy(ids)
+            disconnected = identifyDisconnected(nodes, groups, groupSize, nodeToIndex)
+            physical = applyDisconnected( disconnected, physical)
+
         print "*Writing msh file: ",outFile
         elemFields = ['force','delta','area']
         elemData = [force, area, delta]
@@ -376,6 +399,11 @@ def main(files):
     return
 
 #general-output*.dump, contact_output*.dump (lengths must match)
-files = sys.argv[1:]
-main(files)
-
+if __name__ == "__main__":
+    optlist,args = getopt.getopt(sys.argv[1:],'',longopts=['clustering'])
+    clustering = 0
+    for item in optlist:
+        if (item[0] == '--clustering'):
+            clustering = 1 
+    tag = ''
+    main(args,clustering=clustering)
