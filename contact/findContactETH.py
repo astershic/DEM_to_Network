@@ -8,7 +8,7 @@
 import os
 import math
 import sys
-from clustering import calc_clusters,identifyDisconnected
+from clustering import calc_clusters_scipy,identifyDisconnected
 
 #run: python sphereContact.py *.txt
 
@@ -339,11 +339,30 @@ def applyDisconnected( disconnected, physical, code=7):
  
     return newPhysical
 
+def writeContactFile(file, unitvec, weights=None):
+
+    numEdges = len(unitvec)
+
+    if (weights == None):
+        weights = [1.0] * numEdges 
+    assert(len(unitvec) == numEdges) 
+
+    with open(file,'w') as f:
+        for i in range(0, numEdges):
+
+            vec = unitvec[i]
+            weight = weights[i]
+ 
+            f.write('{} {} {} {}\n'.format(unitvec[0], unitvec[1], unitvec[2], weight) )
+            
+    return
+
 def main(files,tag,clustering=1):
 
     for file in files:
         base = os.path.basename(file)
         outFile = '.'.join(base.split('.')[:-1])+tag+'_contact.msh'
+        outContactFile = '.'.join(outFile.split('.')[:-1])+'_contact.txt'
  
         print "*Reading ETHZ particle stats file ",file
         ids,rad,centroid,limits = readFile(file)
@@ -354,7 +373,7 @@ def main(files,tag,clustering=1):
 
         if (clustering == 1):
             print "*Clustering network"
-            nodes,groups,groupSize,nodeToIndex = calc_clusters(idpair)
+            nodes,groups,groupSize,nodeToIndex = calc_clusters_scipy(idpair)
             disconnected = identifyDisconnected(nodes, groups, groupSize, nodeToIndex)
             physical = applyDisconnected( disconnected, physical)
 
@@ -364,6 +383,9 @@ def main(files,tag,clustering=1):
         nodeFields = ['position','radius']
         nodeData = [centroid,rad]
         writeMshFile(outFile, ids, centroid, idpair, physical, elemFields, elemData, nodeFields, nodeData, nodesInElements)
+
+        print "*Writing contact file: ",outFile
+        writeContactFile(outContactFile, unitvec, weights=area)    #area as scalar weight
     return
 
 tag = ''

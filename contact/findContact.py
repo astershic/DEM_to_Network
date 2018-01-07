@@ -313,6 +313,40 @@ def getGeom(ids, pos):
             edges.append([id2, id1])
 
     return verts,edges
+ 
+def writeContactFile(file, verts, edges, weights=None):
+
+    numEdges = len(edges)
+
+    if (weights == None):
+        weights = [1.0] * numEdges 
+    assert(len(weights) == numEdges) 
+
+    with open(file,'w') as f:
+        for i in range(0, numEdges):
+            edge = edges[i] 
+            weight = weights[i]
+ 
+            v1 = edge[0]
+            v2 = edge[1]
+
+            coord1 = verts[v1]
+            coord2 = verts[v2]
+
+            x1 = coord1[0] 
+            y1 = coord1[1] 
+            z1 = coord1[2] 
+            x2 = coord2[0] 
+            y2 = coord2[1] 
+            z2 = coord2[2] 
+            dx = x2-x1
+            dy = y2-y1
+            dz = z2-z1
+            norm = math.sqrt(dx*dx + dy*dy + dz*dz)
+
+            f.write('{} {} {} {}\n'.format(dx/norm, dy/norm, dz/norm, weight) )
+            
+    return
 
 def main(files):
     assert( len(files) % 2 == 0)
@@ -321,6 +355,7 @@ def main(files):
         generalFile = files[i]
         contactFile = files[i + len(files)/2]    
         outFile = '.'.join(contactFile.split('.')[:-1])+'_contact.msh'
+        outContactFile = '.'.join(contactFile.split('.')[:-1])+'_contact.txt'
  
         print "*Reading contact file ",contactFile
         ids,pos,force,area,delta,limits=readContactFile(contactFile)
@@ -328,13 +363,16 @@ def main(files):
         position,radius,physical=readGeneralFile(generalFile,limits)
         print "*Getting geometry"
         verts,edges = getGeom(ids,pos)
-        print "*Writing msh file: ",outFile
 
+        print "*Writing msh file: ",outFile
         elemFields = ['force','delta','area']
         elemData = [force, area, delta]
         nodeFields = ['position','radius']
         nodeData = [position,radius]
         writeMshFile(outFile, verts, edges, physical, elemFields, elemData, nodeFields, nodeData)
+
+        print "*Writing contact file: ",outFile
+        writeContactFile(outContactFile, verts, edges, weights=area)    #area as scalar weight
     return
 
 #general-output*.dump, contact_output*.dump (lengths must match)
