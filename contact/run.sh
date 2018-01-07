@@ -26,7 +26,6 @@ time python findContactETH.py --clustering ../ethz/90wt_2000bar.txt
 
 
 
-#add clustering/disconnect as option to findContact*.py
 #check msh file okay
 #see if this solves truss problem
 #only print contact to FT contact list when connected to main body
