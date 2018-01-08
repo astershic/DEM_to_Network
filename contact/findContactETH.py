@@ -3,6 +3,8 @@
 #general:
 #ITEM: ATOMS id type type x y z ix iy iz vx vy vz fx fy fz omegax omegay omegaz radius c_contactnum
 
+#python findContactETH.py --clustering --writeOnlyConnected ../ethz/90wt_2000bar.txt
+
 #histogram:   --> cellDatatoPointData --> Histogram
 #line thickness: ---> cellDatatoPointData ---> ExtractSurface --> Tube
 import getopt
@@ -340,9 +342,10 @@ def applyDisconnected( disconnected, physical, code=7):
  
     return newPhysical
 
-def writeContactFile(file, unitvec, weights=None):
+def writeContactFile(file, unitvec, idpair, writeOnlyConnected, disconnected, weights=None):
 
     numEdges = len(unitvec)
+    assert(len(idpair) == numEdges)
 
     if (weights == None):
         weights = [1.0] * numEdges 
@@ -353,12 +356,23 @@ def writeContactFile(file, unitvec, weights=None):
 
             vec = unitvec[i]
             weight = weights[i]
+
+            v1 = idpair[i][0]
+            v2 = idpair[i][1]
+
+            #double check indexing
+            #if disconnected, don't write
+            if (writeOnlyConnected == 1):
+                if (v1 in disconnected):
+                    continue
+                if (v2 in disconnected):
+                    continue
  
-            f.write('{} {} {} {}\n'.format(unitvec[0], unitvec[1], unitvec[2], weight) )
+            f.write('{} {} {} {}\n'.format(vec[0], vec[1], vec[2], weight) )
             
     return
 
-def main(files,tag,clustering):
+def main(files,tag,clustering,writeOnlyConnected):
 
     for file in files:
         base = os.path.basename(file)
@@ -386,14 +400,17 @@ def main(files,tag,clustering):
         writeMshFile(outFile, ids, centroid, idpair, physical, elemFields, elemData, nodeFields, nodeData, nodesInElements)
 
         print "*Writing contact file: ",outFile
-        writeContactFile(outContactFile, unitvec, weights=area)    #area as scalar weight
+        writeContactFile(outContactFile, unitvec, idpair, writeOnlyConnected, disconnected, weights=area)    #area as scalar weight
     return
 
 if __name__ == "__main__":
-    optlist,args = getopt.getopt(sys.argv[1:],'',longopts=['clustering'])
+    optlist,args = getopt.getopt(sys.argv[1:],'',longopts=['clustering','writeOnlyConnected'])
     clustering = 0
+    writeOnlyConnected = 0
     for item in optlist:
         if (item[0] == '--clustering'):
             clustering = 1 
+        elif (item[0] == '--writeOnlyConnected'):
+            writeOnlyConnected = 1 
     tag = ''
-    main(args,tag,clustering=clustering)
+    main(args,tag,clustering,writeOnlyConnected)
