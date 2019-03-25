@@ -163,26 +163,27 @@ def readFile(file):
             xpos = float(ls[5])
             ypos = float(ls[6])
             zpos = float(ls[7])
-
-            if (xneg < xmin or xmin == None):
-                xmin = xneg 
-            if (yneg < ymin or ymin == None):
-                ymin = yneg 
-            if (zneg < zmin or zmin == None):
-                zmin = zneg 
-            if (xpos > xmax or xmax == None):
-                xmax = xpos 
-            if (ypos > ymax or ymax == None):
-                ymax = ypos 
-            if (zpos > zmax or zmax == None):
-                zmax = zpos 
             
             rad = math.pow(vol*3.0/4.0, 1.0/3.0)
+
+            if (xneg < xmin or xmin == None):
+                xmin = xneg-rad*0 
+            if (yneg < ymin or ymin == None):
+                ymin = yneg-rad*0
+            if (zneg < zmin or zmin == None):
+                zmin = zneg-rad*0
+            if (xpos > xmax or xmax == None):
+                xmax = xpos+rad*0
+            if (ypos > ymax or ymax == None):
+                ymax = ypos+rad*0
+            if (zpos > zmax or zmax == None):
+                zmax = zpos+rad*0
             
             ids.append(id)
             rads.append(rad)
             centroids.append([xc, yc, zc])
-            limits = [ [xmin, xmax], [ymin, ymax], [zmin, zmax] ]
+        limits = [ [xmin, xmax], [ymin, ymax], [zmin, zmax] ]
+        print "Limits:",limits     
     return ids, rads, centroids, limits
 
 def writePhysicalNodes(file, elemCount, verts, physical, nodesInElements):
@@ -204,7 +205,7 @@ def writePhysicalNodes(file, elemCount, verts, physical, nodesInElements):
 #        file.write('{} {} {} {} {}\n'.format(elemCount + extraElem, 15, len(bc), bcString, key) )   #"element" number, type 15=point, number of physical tags, physical ID, nodeID
         for item in bc:
             extraElem += 1
-            file.write('{} {} {} {} {}\n'.format(elemCount + extraElem, 15, 1, item, key) )   #"element" number, type 15=point, physical ID, nodeID   ----- note limit of one physical tag per element!!!
+            file.write('{} {} {} {} {}\n'.format(elemCount + extraElem, 15, 1, item, key) )   #"element" number, type 15=point, physical ID, nodeID   ----- note GMSH limit of one physical tag per element!!! have to write separately...
     return 
  
 def writeElementData(file, field, fieldname):
@@ -309,6 +310,7 @@ def writeMshFile(filename, verts, centroid, edges, physical, elemFields, elemDat
             print '# physBC = ',totalElements-len(edges)
         file.write('$Elements\n')
         file.write('{}\n'.format(totalElements))
+        #line elements
         for i in range(0, len(edges)):
             edge = edges[i]
             file.write('{} {} {} {} {}\n'.format(i+1, 1, 0, edge[0], edge[1])) #type: 1 = 2-node line, number of physical group tags = 0 
